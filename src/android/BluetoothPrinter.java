@@ -14,6 +14,8 @@ import java.util.Set;
 import java.util.UUID;
 
 import org.apache.cordova.CallbackContext;
+import org.apache.cordova.CordovaInterface;
+import org.apache.cordova.CordovaWebView;
 import org.apache.cordova.CordovaPlugin;
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -63,61 +65,104 @@ public class BluetoothPrinter extends CordovaPlugin {
 
 	public BluetoothPrinter() {}
 
-	@Override
-	public boolean execute(String action, JSONArray args, CallbackContext callbackContext) throws JSONException {
+	public void initialize(CordovaInterface cordova, CordovaWebView webView) {
+		super.initialize(cordova, webView);
+	}
+
+	public boolean execute(final String action, final JSONArray args, final CallbackContext callbackContext) throws JSONException {
 		if (action.equals("list")) {
-			listBT(callbackContext);
+			cordova.getThreadPool().execute(new Runnable() {
+				public void run() {
+					listBT(callbackContext);
+				}
+			});
 			return true;
 		} else if (action.equals("connect")) {
-			String name = args.getString(0);
-			if (findBT(callbackContext, name)) {
-				try {
-					connectBT(callbackContext);
-				} catch (IOException e) {
-					sendStackTrace(callbackContext, e);
+			cordova.getThreadPool().execute(new Runnable() {
+				public void run()  {
+					try {
+						String name = args.getString(0);
+						if (findBT(callbackContext, name)) {
+							try {
+								connectBT(callbackContext);
+							} catch (IOException e) {
+								sendStackTrace(callbackContext, e);
+							}
+						} else {
+							callbackContext.error("Bluetooth Device Not Found: " + name);
+						}
+					} catch (Exception e) {
+						sendStackTrace(callbackContext, e);
+					}
 				}
-			} else {
-				callbackContext.error("Bluetooth Device Not Found: " + name);
-			}
+			});
 			return true;
 		} else if (action.equals("disconnect")) {
-			try {
-				disconnectBT(callbackContext);
-			} catch (IOException e) {
-				sendStackTrace(callbackContext, e);
-			}
+			cordova.getThreadPool().execute(new Runnable() {
+				public void run() {
+					try {
+						disconnectBT(callbackContext);
+					} catch (IOException e) {
+						sendStackTrace(callbackContext, e);
+					}
+				}
+			});
 			return true;
 		} else if (action.equals("print") || action.equals("printImage")) {
-			try {
-				String msg = args.getString(0);
-				printImage(callbackContext, msg);
-			} catch (IOException e) {
-				sendStackTrace(callbackContext, e);
-			}
+			cordova.getThreadPool().execute(new Runnable() {
+				public void run() {
+					try {
+						String msg = args.getString(0);
+						printImage(callbackContext, msg);
+					} catch (IOException e) {
+						sendStackTrace(callbackContext, e);
+					} catch (Exception e) {
+						sendStackTrace(callbackContext, e);
+					}
+				}
+			});
 			return true;
 		} else if (action.equals("printText")) {
-			try {
-				String msg = args.getString(0);
-				printText(callbackContext, msg);
-			} catch (IOException e) {
-				sendStackTrace(callbackContext, e);
-			}
+			cordova.getThreadPool().execute(new Runnable() {
+				public void run() {
+					try {
+						String msg = args.getString(0);
+						printText(callbackContext, msg);
+					} catch (IOException e) {
+						sendStackTrace(callbackContext, e);
+					} catch (Exception e) {
+						sendStackTrace(callbackContext, e);
+					}
+				}
+			});
 			return true;
 		} else if (action.equals("printQRCode")) {
-			try {
-				String msg = args.getString(0);
-				printQRCode(callbackContext, msg);
-			} catch (IOException e) {
-				sendStackTrace(callbackContext, e);
-			}
+			cordova.getThreadPool().execute(new Runnable() {
+				public void run() {
+					try {
+						String msg = args.getString(0);
+						printQRCode(callbackContext, msg);
+					} catch (IOException e) {
+						sendStackTrace(callbackContext, e);
+					} catch (Exception e) {
+						sendStackTrace(callbackContext, e);
+					}
+				}
+			});
 			return true;
 		} else if (action.equals("printPOSCommand")) {
-			try {
-				String msg = args.getString(0);
-				printPOSCommand(callbackContext, hexStringToBytes(msg));
-			} catch (IOException e) {
-				sendStackTrace(callbackContext, e);
-			}
+			cordova.getThreadPool().execute(new Runnable() {
+				public void run() {
+					try {
+						String msg = args.getString(0);
+						printPOSCommand(callbackContext, hexStringToBytes(msg));
+					} catch (IOException e) {
+						sendStackTrace(callbackContext, e);
+					} catch (Exception e) {
+						sendStackTrace(callbackContext, e);
+					}
+				}
+			});
 			return true;
 		}
 		return false;
@@ -273,6 +318,7 @@ public class BluetoothPrinter extends CordovaPlugin {
 	boolean printText(CallbackContext callbackContext, String msg) throws IOException {
 		try {
 			mmOutputStream.write(msg.getBytes(StandardCharsets.ISO_8859_1));
+			//mmOutputStream.write(msg.getBytes("Cp858"));
 			// tell the user data were sent
 			//Log.d(LOG_TAG, "Data Sent");
 			callbackContext.success("Data Sent");
@@ -393,7 +439,7 @@ public class BluetoothPrinter extends CordovaPlugin {
 
 			Bitmap decodedBitmap = BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.length);
 
-			bitmap = decodedBitmap; 
+			bitmap = decodedBitmap;
 
 			int mWidth = bitmap.getWidth();
 			int mHeight = bitmap.getHeight();
@@ -408,10 +454,15 @@ public class BluetoothPrinter extends CordovaPlugin {
 
 
 			byte[] bt = decodeBitmap(bitmap);
+			// Some Printers like BIXOLON needs that every output written be a whole line to be printed.
+			/*byte[] newLines = "\n\n\n\n\n\n\n".getBytes("Cp858");
+			byte[] c = new byte[bt.length + newLines.length];
+			System.arraycopy(bt, 0, c, 0, bt.length);
+			System.arraycopy(newLines, 0, c, bt.length, newLines.length);
+			mmOutputStream.write(c);*/
 
 
 			mmOutputStream.write(bt);
-
 			// tell the user data were sent
 			//Log.d(LOG_TAG, "Data Sent");
 			callbackContext.success("Data Sent");
