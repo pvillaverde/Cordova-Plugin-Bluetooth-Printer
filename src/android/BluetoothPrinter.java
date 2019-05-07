@@ -155,7 +155,7 @@ public class BluetoothPrinter extends CordovaPlugin {
 				public void run() {
 					try {
 						String msg = args.getString(0);
-						printPOSCommand(callbackContext, hexStringToBytes(msg));
+						printPOSCommand(callbackContext, msg);
 					} catch (IOException e) {
 						sendStackTrace(callbackContext, e);
 					} catch (Exception e) {
@@ -320,7 +320,7 @@ public class BluetoothPrinter extends CordovaPlugin {
 			mmOutputStream.write(msg.getBytes(StandardCharsets.ISO_8859_1));
 			//mmOutputStream.write(msg.getBytes("Cp858"));
 			// tell the user data were sent
-			//Log.d(LOG_TAG, "Data Sent");
+			Log.d(LOG_TAG, "printText: " +msg);
 			callbackContext.success("Data Sent");
 			return true;
 		} catch (Exception e) {
@@ -328,6 +328,97 @@ public class BluetoothPrinter extends CordovaPlugin {
 		}
 		return false;
 	}
+
+
+	boolean printPOSCommand(CallbackContext callbackContext, String posCommand) throws IOException {
+		try {
+			//mmOutputStream.write(("Inam").getBytes());
+			//mmOutputStream.write((((char)0x0A) + "10 Rehan").getBytes());
+			Log.d(LOG_TAG, "printPOSCommand: " + posCommand);
+			final byte[] buffer = hexStringToBytes(posCommand);
+			mmOutputStream.write(buffer);
+			//mmOutputStream.write(0x0A);
+
+			// tell the user data were sent
+			callbackContext.success("Data Sent");
+			return true;
+		} catch (Exception e) {
+			sendStackTrace(callbackContext, e);
+		}
+		return false;
+	}
+
+	//This will send data to bluetooth printer
+	boolean printImage(CallbackContext callbackContext, String msg) throws IOException {
+		try {
+
+			//final String encodedString =" data:image/png;base64,-------------------------";
+			final String encodedString = msg;
+			final String pureBase64Encoded = encodedString.substring(encodedString.indexOf(",") + 1);
+
+			final byte[] decodedBytes = Base64.decode(pureBase64Encoded, Base64.DEFAULT);
+
+			Bitmap decodedBitmap = BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.length);
+
+			bitmap = decodedBitmap;
+
+			int mWidth = bitmap.getWidth();
+			int mHeight = bitmap.getHeight();
+			int width = 250;
+			int height = 250;
+			if (mWidth > mHeight) {
+				height = (int) (((float)mHeight/mWidth) * width);
+			}else if (mWidth < mHeight) {
+				width = (int) (((float)mWidth/mHeight) * height);
+			}
+			bitmap = resizeImage(bitmap, width, height);
+
+
+			byte[] buffer = decodeBitmap(bitmap);
+			// Some Printers like BIXOLON needs that every output written be a whole line to be printed.
+			/*byte[] newLines = "\n".getBytes();
+			byte[] newLines = hexStringToBytes("1B 64 02");
+			byte[] c = new byte[buffer.length + newLines.length];
+			System.arraycopy(buffer, 0, c, 0, buffer.length);
+			System.arraycopy(newLines, 0, c, buffer.length, newLines.length);
+			Log.d(LOG_TAG, "Image bitmap :"+bitmap);
+			Log.d(LOG_TAG, "Image bytes:"+buffer);
+			Log.d(LOG_TAG, "Image length:"+c.length);
+			mmOutputStream.write(c);*/
+
+			//byte[] buffer = new byte[50000];
+			// Code provided by BIXOLON to ensure max printer buffer
+			int nPos = 0, nWrite = 0;
+			while(true)
+			{
+				nWrite = ((buffer.length - nPos) > 500) ? 500 : (buffer.length - nPos);
+
+				mmOutputStream.write(buffer, nPos, nWrite);
+				mmOutputStream.flush();
+
+				nPos += nWrite;
+				if(nPos >= buffer.length)
+				{
+					break;
+				}
+				else
+				{
+					Thread.sleep(50);
+				}
+			}
+			// mmOutputStream.write(buffer);
+			// tell the user data were sent
+			//Log.d(LOG_TAG, "Data Sent");
+			callbackContext.success("Data Sent");
+			return true;
+
+
+		} catch (Exception e) {
+			sendStackTrace(callbackContext, e);
+		}
+		return false;
+	}
+
 	// NOTE-PV: Not tested (From Josue Alexander Ibarra https://stackoverflow.com/a/29221432/9267268)
 	// NOTE-PV: Other option: https://github.com/srehanuddin/Cordova-Plugin-Bluetooth-Printer/issues/24
 	boolean printQRCode(CallbackContext callbackContext, String qrdata) throws IOException {
@@ -419,72 +510,6 @@ public class BluetoothPrinter extends CordovaPlugin {
 			mmOutputStream.write(printQR);
 			// tell the user data were sent
 			//Log.d(LOG_TAG, "Data Sent");
-			callbackContext.success("Data Sent");
-			return true;
-		} catch (Exception e) {
-			sendStackTrace(callbackContext, e);
-		}
-		return false;
-	}
-
-	//This will send data to bluetooth printer
-	boolean printImage(CallbackContext callbackContext, String msg) throws IOException {
-		try {
-
-			//final String encodedString =" data:image/png;base64,-------------------------";
-			final String encodedString = msg;
-			final String pureBase64Encoded = encodedString.substring(encodedString.indexOf(",") + 1);
-
-			final byte[] decodedBytes = Base64.decode(pureBase64Encoded, Base64.DEFAULT);
-
-			Bitmap decodedBitmap = BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.length);
-
-			bitmap = decodedBitmap;
-
-			int mWidth = bitmap.getWidth();
-			int mHeight = bitmap.getHeight();
-			int width = 250;
-			int height = 250;
-			if (mWidth > mHeight) {
-				height = (int) (((float)mHeight/mWidth) * width);
-			}else if (mWidth < mHeight) {
-				width = (int) (((float)mWidth/mHeight) * height);
-			}
-			bitmap = resizeImage(bitmap, width, height);
-
-
-			byte[] bt = decodeBitmap(bitmap);
-			// Some Printers like BIXOLON needs that every output written be a whole line to be printed.
-			/*byte[] newLines = "\n\n\n\n\n\n\n".getBytes("Cp858");
-			byte[] c = new byte[bt.length + newLines.length];
-			System.arraycopy(bt, 0, c, 0, bt.length);
-			System.arraycopy(newLines, 0, c, bt.length, newLines.length);
-			mmOutputStream.write(c);*/
-
-
-			mmOutputStream.write(bt);
-			// tell the user data were sent
-			//Log.d(LOG_TAG, "Data Sent");
-			callbackContext.success("Data Sent");
-			return true;
-
-
-		} catch (Exception e) {
-			sendStackTrace(callbackContext, e);
-		}
-		return false;
-	}
-
-
-	boolean printPOSCommand(CallbackContext callbackContext, byte[] buffer) throws IOException {
-		try {
-			//mmOutputStream.write(("Inam").getBytes());
-			//mmOutputStream.write((((char)0x0A) + "10 Rehan").getBytes());
-			mmOutputStream.write(buffer);
-			//mmOutputStream.write(0x0A);
-
-			// tell the user data were sent
-			Log.d(LOG_TAG, "Data Sent");
 			callbackContext.success("Data Sent");
 			return true;
 		} catch (Exception e) {
@@ -657,6 +682,10 @@ public class BluetoothPrinter extends CordovaPlugin {
 		commandList.add(commandHexString + widthHexString + heightHexString);
 		commandList.addAll(bmpHexList);
 
+		Log.d(LOG_TAG, "DECODEBITMAP HEX: \n\n");
+		for (String hexStr: commandList) {
+			Log.d(LOG_TAG, hexStr);
+		}
 		return hexList2Byte(commandList);
 	}
 
